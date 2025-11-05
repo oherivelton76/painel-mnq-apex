@@ -1,170 +1,139 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Painel MNQ — APEX / NinjaTrader (v4)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel Pré-Mercado Nasdaq-100</title>
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      background-color: #0c0c0f;
-      color: #eaeaea;
+      font-family: Arial, sans-serif;
+      background-color: #f8fafc;
+      color: #1e293b;
       margin: 0;
-      padding: 0;
+      padding: 20px;
     }
     header {
-      background-color: #11131a;
       text-align: center;
-      padding: 15px;
-      font-size: 1.4em;
-      font-weight: bold;
-      color: #00bcd4;
-      border-bottom: 1px solid #222;
+      margin-bottom: 20px;
     }
-    main {
-      padding: 15px;
-      max-width: 900px;
-      margin: auto;
+    h1 {
+      color: #0f172a;
     }
     section {
-      margin-bottom: 20px;
-      background: #16181f;
+      background: #ffffff;
       border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       padding: 15px;
-      box-shadow: 0 0 10px #0003;
+      margin-bottom: 20px;
     }
     h2 {
-      color: #00bcd4;
-      border-bottom: 1px solid #333;
-      padding-bottom: 5px;
+      color: #334155;
+      font-size: 1.2rem;
+      margin-top: 0;
     }
-    a {
-      color: #00bcd4;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-    .quote {
-      display: flex;
-      justify-content: space-between;
-      margin: 5px 0;
-      font-size: 1.1em;
-    }
-    .timestamp {
-      font-size: 0.9em;
-      color: #999;
-    }
-    footer {
-      text-align: center;
-      font-size: 0.8em;
-      color: #777;
-      padding: 10px;
+    .data {
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <header>Painel MNQ — APEX / NinjaTrader</header>
-  <main>
-    <section>
-      <p><b>Foco:</b> Micro E-mini Nasdaq-100 (MNQ) — Preços & Manchetes</p>
-      <p class="timestamp" id="time"></p>
-    </section>
+  <header>
+    <h1>Painel Pré-Mercado - Nasdaq 100</h1>
+    <p>Atualização automática de dados via APIs públicas</p>
+  </header>
 
-    <section id="quotes">
-      <h2>📈 Cotações ao Vivo</h2>
-      <div id="prices">Carregando cotações...</div>
-    </section>
+  <section id="nasdaq">
+    <h2>Nasdaq 100 - Futuro</h2>
+    <p><span class="data" id="nasdaqValue">Carregando...</span></p>
+  </section>
 
-    <section id="news">
-      <h2>📰 Manchetes Globais (Impacto no Nasdaq-100)</h2>
-      <ul id="headlines">Carregando manchetes...</ul>
-    </section>
+  <section id="globalMarkets">
+    <h2>Bolsas Globais</h2>
+    <ul id="marketsList"></ul>
+  </section>
 
-    <section>
-      <h2>📅 Calendário Econômico</h2>
-      <p>Confira eventos macro que podem impactar o mercado:</p>
-      <p><a href="https://www.investing.com/economic-calendar/" target="_blank">Abrir Calendário — Investing.com</a></p>
-      <p><a href="https://www.forexfactory.com/calendar" target="_blank">Abrir Calendário — ForexFactory</a></p>
-    </section>
-  </main>
+  <section id="commodities">
+    <h2>Commodities</h2>
+    <ul id="commoditiesList"></ul>
+  </section>
 
-  <footer>
-    Painel MNQ — Versão NinjaTrader v4 · Modo Escuro · Atualiza a cada 5 min
-  </footer>
+  <section id="agenda">
+    <h2>Agenda Econômica (EUA)</h2>
+    <ul id="agendaList"></ul>
+  </section>
+
+  <section>
+    <h2>Resumo para o Trader</h2>
+    <p>📊 Analise o comportamento do Nasdaq-100 futuro. Se houver volatilidade forte na pré-abertura, ajuste stops e metas conforme o volume de Nova York. Atenção aos discursos do FED e indicadores de emprego.</p>
+  </section>
 
   <script>
-    function updateTime() {
-      const now = new Date();
-      document.getElementById('time').textContent = 
-        `Atualizado: ${now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
+    // Atualiza valor do Nasdaq 100 Futuro (Yahoo Finance API pública)
+    async function getNasdaq() {
+      const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/NQ=F');
+      const data = await res.json();
+      const price = data.chart.result[0].meta.regularMarketPrice;
+      document.getElementById('nasdaqValue').textContent = `${price.toFixed(2)} pts`;
     }
 
-    async function loadQuotes() {
-      const proxies = [
-        'https://api.allorigins.win/get?url=',
-        'https://api.codetabs.com/v1/proxy?quest='
-      ];
-      let success = false;
-      for (const proxy of proxies) {
-        try {
-          const url = proxy + encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/quote?symbols=NQ=F,^VIX,DX-Y.NYB,^TNX');
-          const response = await fetch(url);
-          const data = await response.json();
-          const json = JSON.parse(data.contents || JSON.stringify(data));
-          const results = json.quoteResponse.result;
-          let html = '';
-          results.forEach(q => {
-            const name = q.shortName || q.symbol;
-            const price = q.regularMarketPrice ? q.regularMarketPrice.toFixed(2) : '-';
-            const change = q.regularMarketChange ? q.regularMarketChange.toFixed(2) : '-';
-            html += `<div class='quote'><span>${name}</span><span>${price} (${change})</span></div>`;
-          });
-          document.getElementById('prices').innerHTML = html;
-          success = true;
-          break;
-        } catch (err) {
-          continue;
-        }
+    // Atualiza principais bolsas globais
+    async function getMarkets() {
+      const symbols = {
+        'S&P 500': 'ES=F',
+        'Dow Jones': 'YM=F',
+        'DAX (Alemanha)': 'FDAX.DE',
+        'Nikkei (Japão)': 'N225',
+        'IBOVESPA': '^BVSP'
+      };
+      const list = document.getElementById('marketsList');
+      for (const [name, symbol] of Object.entries(symbols)) {
+        const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`);
+        const data = await res.json();
+        const price = data.chart.result[0].meta.regularMarketPrice;
+        const li = document.createElement('li');
+        li.textContent = `${name}: ${price.toFixed(2)}`;
+        list.appendChild(li);
       }
-      if (!success) document.getElementById('prices').textContent = 'Erro ao carregar cotações.';
     }
 
-    async function loadNews() {
-      const feeds = [
-        'https://feeds.reuters.com/reuters/businessNews',
-        'https://www.cnbc.com/id/100003114/device/rss/rss.xml',
-        'https://finance.yahoo.com/news/rssindex'
-      ];
-      const items = [];
-      for (const feed of feeds) {
-        try {
-          const res = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(feed));
-          const data = await res.json();
-          const xml = new DOMParser().parseFromString(data.contents, 'text/xml');
-          xml.querySelectorAll('item').forEach(i => {
-            items.push({
-              title: i.querySelector('title')?.textContent || '',
-              link: i.querySelector('link')?.textContent || '#',
-              pubDate: i.querySelector('pubDate')?.textContent || ''
-            });
-          });
-        } catch (e) { continue; }
+    // Atualiza commodities (petróleo, ouro, prata)
+    async function getCommodities() {
+      const symbols = {
+        'Petróleo WTI': 'CL=F',
+        'Ouro': 'GC=F',
+        'Prata': 'SI=F'
+      };
+      const list = document.getElementById('commoditiesList');
+      for (const [name, symbol] of Object.entries(symbols)) {
+        const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`);
+        const data = await res.json();
+        const price = data.chart.result[0].meta.regularMarketPrice;
+        const li = document.createElement('li');
+        li.textContent = `${name}: ${price.toFixed(2)}`;
+        list.appendChild(li);
       }
-      items.sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate));
-      const latest = items.slice(0, 10);
-      let html = '';
-      latest.forEach(n => {
-        html += `<li><a href='${n.link}' target='_blank'>${n.title}</a><br><span class='timestamp'>${new Date(n.pubDate).toLocaleString('pt-BR')}</span></li>`;
-      });
-      document.getElementById('headlines').innerHTML = html || 'Nenhuma manchete encontrada.';
     }
 
-    updateTime();
-    loadQuotes();
-    loadNews();
-    setInterval(() => { updateTime(); loadQuotes(); loadNews(); }, 300000);
+    // Atualiza agenda econômica (EUA)
+    async function getAgenda() {
+      try {
+        const res = await fetch('https://api.tradingeconomics.com/calendar?country=united%20states&c=guest:guest');
+        const data = await res.json();
+        const list = document.getElementById('agendaList');
+        data.slice(0, 5).forEach(event => {
+          const li = document.createElement('li');
+          li.textContent = `${event.Date.substring(11,16)} - ${event.Event} (${event.Country})`;
+          list.appendChild(li);
+        });
+      } catch (e) {
+        document.getElementById('agendaList').innerHTML = '<li>Erro ao carregar agenda</li>';
+      }
+    }
+
+    getNasdaq();
+    getMarkets();
+    getCommodities();
+    getAgenda();
   </script>
 </body>
 </html>
