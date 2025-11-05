@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Painel MNQ APEX — NinjaTrader (Dark) — Preços & Manchetes</title>
+  <style>
+    :root{--bg:#05070a;--panel:#081016;--muted:#9aa7b2;--accent:#00e0a8;--danger:#ff6b6b;--card-radius:12px;font-family:Inter, Roboto, Arial, Helvetica, sans-serif}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#030406 0%,#05070a 100%);color:#d8e6ef}
+    .wrap{padding:16px;display:flex;gap:16px;box-sizing:border-box;min-height:100vh}
+    .col-left{width:360px;display:flex;flex-direction:column;gap:12px}
+    .col-right{flex:1;display:flex;flex-direction:column;gap:12px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:12px;border-radius:var(--card-radius);box-shadow:0 8px 30px rgba(2,6,12,0.7)}
+    .small{min-height:120px}
+    h1{margin:0;font-size:16px}
+    .muted{color:var(--muted);font-size:13px}
+    .time{font-weight:700;font-size:14px}
+    .btn{background:transparent;border:1px solid rgba(255,255,255,0.03);padding:8px 10px;border-radius:8px;color:var(--accent);cursor:pointer}
+    .price{font-weight:800;font-size:28px}
+    .chg{font-weight:700;font-size:14px}
+    .news-list{display:flex;flex-direction:column;gap:8px;max-height:520px;overflow:auto;padding-right:6px}
+    .news-item{padding:10px;border-radius:8px;background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.02);cursor:pointer}
+    .news-title{font-weight:700}
+    .news-meta{font-size:12px;color:var(--muted);margin-top:6px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;text-align:left;border-bottom:1px dashed rgba(255,255,255,0.03);font-size:13px}
+    th{color:var(--muted);font-weight:700}
+    .footer{display:flex;justify-content:space-between;color:var(--muted);font-size:13px}
+    @media (max-width:980px){.wrap{flex-direction:column}.col-left{width:100%}}
+    a{color:var(--accent)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="col-left">
+      <div class="card small">
+        <h1>Painel MNQ — APEX / NinjaTrader</h1>
+        <div class="muted">Foco: Micro E‑mini Nasdaq‑100 (MNQ) — Preços & Manchetes</div>
+        <div style="height:8px"></div>
+        <div class="time" id="localTime">--:--</div>
+        <div class="muted">Horário: São Paulo (BRT)</div>
+      </div>
+
+      <div class="card small">
+        <div class="muted">Configuração (opcional)</div>
+        <div style="height:8px"></div>
+        <input id="newsKey" placeholder="NewsAPI key (opcional)" style="width:100%;padding:8px;border-radius:8px;border:none;background:#071018;color:#dbe6ef;box-sizing:border-box" />
+        <div style="height:8px"></div>
+        <input id="rssInput" placeholder="RSS (opcional) — ex: https://www.reuters.com/finance" style="width:100%;padding:8px;border-radius:8px;border:none;background:#071018;color:#dbe6ef;box-sizing:border-box" />
+        <div style="height:8px"></div>
+        <button class="btn" id="refreshBtn">Atualizar agora</button>
+        <div style="height:8px"></div>
+        <div class="muted">Sem chave: o painel tentará usar RSS públicos como fallback para manchetes.</div>
+      </div>
+
+      <div class="card small">
+        <div class="muted">APEX / NinjaTrader Notes</div>
+        <div style="height:6px"></div>
+        <div class="muted">Use este painel como briefing. Abra NinjaTrader no monitor principal e este painel no secundário (ou no Web Tab do NinjaTrader 8).</div>
+      </div>
+
+      <div class="card small">
+        <div class="muted">Dicas rápidas</div>
+        <ul class="muted">
+          <li>Período crítico: 08:50–11:30 BRT (pré-abertura e abertura EUA).</li>
+          <li>Evite alavancagem próxima a anúncios de alto impacto.</li>
+          <li>Verifique drawdown diário antes de posições grandes.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div class="card" style="min-height:140px;display:flex;gap:12px;align-items:center;">
+        <div style="flex:1">
+          <div class="muted">Nasdaq‑100 Futures (referência)</div>
+          <div class="price" id="nqPrice">—</div>
+          <div class="chg" id="nqChg">—</div>
+        </div>
+        <div style="width:260px">
+          <div class="muted">Indicadores</div>
+          <table>
+            <tbody>
+              <tr><td class="muted">VIX (medo)</td><td id="vix">—</td></tr>
+              <tr><td class="muted">DXY (dólar)</td><td id="dxy">—</td></tr>
+              <tr><td class="muted">UST 10Y</td><td id="treasury">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="min-height:340px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="muted">Manchetes (foco: impacto no MNQ)</div>
+          <div class="muted" id="newsTime">Última: --</div>
+        </div>
+        <div class="news-list" id="newsList">
+          <div class="muted">Carregando notícias... Clique em Atualizar ou cole uma NewsAPI key/RSS.</div>
+        </div>
+      </div>
+
+      <div class="card" style="min-height:160px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="muted">Calendário econômico (próximos eventos relevantes)</div>
+          <div class="muted">Fonte: Investing / ForexFactory</div>
+        </div>
+        <div id="calendarArea" class="muted">Abra o link para ver o calendário completo.</div>
+        <div style="height:8px"></div>
+        <a class="muted" target="_blank" href="https://br.investing.com/economic-calendar/">Abrir Investing.com — Calendário</a>
+      </div>
+
+      <div class="card footer" style="align-items:center">
+        <div class="muted">Template gerado por ChatGPT · Versão: NinjaTrader · Dark</div>
+        <div class="muted">Atualização automática a cada 5 minutos</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const config = {
+    timezone: 'America/Sao_Paulo',
+    newsApiUrl: 'https://newsapi.org/v2/everything',
+    rss2jsonUrl: 'https://api.rss2json.com/v1/api.json',
+    autoInterval: 5*60*1000
+  };
+
+  function updateClock(){
+    const now = new Date();
+    const s = now.toLocaleString('pt-BR', {timeZone: config.timezone});
+    const d = new Date(s);
+    const hhmm = d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const dateStr = d.toLocaleDateString('pt-BR');
+    document.getElementById('localTime').textContent = hhmm + ' · ' + dateStr;
+  }
+  setInterval(updateClock,1000); updateClock();
+
+  // Fetch prices using Yahoo Finance public endpoint (client-side)
+  async function fetchPrices(){
+    try{
+      // Nasdaq E-mini futures symbol on Yahoo is NQ=F
+      const resNQ = await fetch('https://query1.finance.yahoo.com/v7/finance/quote?symbols=NQ=F,VIX=F,DXY=X,US10Y:US'); // attempt multiple symbols
+      const jn = await resNQ.json();
+      const quotes = jn.quoteResponse && jn.quoteResponse.result ? jn.quoteResponse.result : [];
+      // helper to find
+      function q(sym){ return quotes.find(x=>x.symbol===sym) || null; }
+      const nq = q('NQ=F') || q('^NDX') || quotes[0] || null;
+      const vix = q('VIX=F') || null;
+      const dxy = q('DXY=X') || null;
+      const ty = q('US10Y:US') || null;
+
+      if(nq){
+        const price = nq.regularMarketPrice ?? nq.regularMarketLastClose ?? '--';
+        const change = nq.regularMarketChangePercent ? (nq.regularMarketChangePercent).toFixed(2) + '%' : '--';
+        document.getElementById('nqPrice').textContent = price;
+        document.getElementById('nqChg').textContent = change;
+      } else {
+        document.getElementById('nqPrice').textContent = '—';
+        document.getElementById('nqChg').textContent = '—';
+      }
+      document.getElementById('vix').textContent = vix ? ((vix.regularMarketPrice||'—')) : '—';
+      document.getElementById('dxy').textContent = dxy ? ((dxy.regularMarketPrice||'—')) : '—';
+      document.getElementById('treasury').textContent = ty ? ((ty.regularMarketPrice||'—')) : '—';
+    }catch(err){
+      console.log('Erro preços:', err);
+      document.getElementById('nqPrice').textContent = '—';
+      document.getElementById('nqChg').textContent = '—';
+      document.getElementById('vix').textContent = '—';
+      document.getElementById('dxy').textContent = '—';
+      document.getElementById('treasury').textContent = '—';
+    }
+  }
+
+  // Fetch headlines focusing on Nasdaq movers. Uses NewsAPI if key provided, otherwise fallback to RSS from Reuters/Bloomberg.
+  async function fetchHeadlines(){
+    const key = document.getElementById('newsKey').value.trim();
+    const rss = document.getElementById('rssInput').value.trim();
+    const container = document.getElementById('newsList');
+    container.innerHTML = '<div class="muted">Buscando notícias...</div>';
+    try{
+      let articles = [];
+      if(key){
+        const url = new URL(config.newsApiUrl);
+        url.searchParams.set('apiKey', key);
+        url.searchParams.set('q', 'Nasdaq OR Nasdaq-100 OR MNQ OR Nvidia OR Apple OR Microsoft OR Tesla OR semiconductors OR Fed OR inflation OR interest rate OR China');
+        url.searchParams.set('language','en');
+        url.searchParams.set('pageSize','30');
+        url.searchParams.set('sortBy','publishedAt');
+        const r = await fetch(url);
+        const j = await r.json();
+        if(j.articles) articles = j.articles;
+      } else if(rss){
+        const u = new URL(config.rss2jsonUrl);
+        u.searchParams.set('rss_url', rss);
+        const r = await fetch(u);
+        const j = await r.json();
+        if(j.items) articles = j.items.map(it=>({title:it.title,description:it.description,source:{name:it.author||''},publishedAt:it.pubDate||'',url:it.link}));
+      } else {
+        // Fallback: use a small set of public RSS from Reuters Markets + CNBC
+        const feeds = [
+          'https://www.reutersagency.com/feed/?best-topics=finance', 
+          'https://www.cnbc.com/id/100003114/device/rss/rss.html',
+          'https://www.investing.com/rss/news.rss'
+        ];
+        // try first feed that responds
+        for(const f of feeds){
+          try{
+            const u = new URL(config.rss2jsonUrl);
+            u.searchParams.set('rss_url', f);
+            const r = await fetch(u);
+            const j = await r.json();
+            if(j.items && j.items.length>0){
+              articles = j.items.map(it=>({title:it.title,description:it.description,source:{name:it.author||''},publishedAt:it.pubDate||'',url:it.link}));
+              break;
+            }
+          }catch(e){}
+        }
+      }
+
+      // filter by relevance keywords
+      const keywords = ['nasdaq','nasdaq-100','mnq','nvidia','apple','microsoft','tesla','semiconductor','tsmc','asml','fed','federal reserve','interest rate','inflation','china'];
+      const filtered = (articles||[]).filter(a=>{
+        const text = (a.title + ' ' + (a.description||'') + ' ' + (a.source && a.source.name? a.source.name : '')).toLowerCase();
+        return keywords.some(k=>text.includes(k));
+      }).slice(0,25);
+
+      if(filtered.length===0){
+        container.innerHTML = '<div class="muted">Nenhuma manchete relevante encontrada no feed atual.</div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      filtered.forEach(a=>{
+        const it = document.createElement('div'); it.className='news-item';
+        const title = document.createElement('div'); title.className='news-title'; title.innerHTML = a.title || '—';
+        const meta = document.createElement('div'); meta.className='news-meta'; meta.textContent = ((a.source && a.source.name)? a.source.name : '') + ' · ' + (a.publishedAt ? new Date(a.publishedAt).toLocaleString() : '');
+        const desc = document.createElement('div'); desc.className='muted'; desc.textContent = a.description ? (a.description.length>220? a.description.slice(0,220)+'...' : a.description) : '';
+        it.appendChild(title); it.appendChild(meta); it.appendChild(desc);
+        it.addEventListener('click', ()=> window.open(a.url,'_blank'));
+        container.appendChild(it);
+      });
+      document.getElementById('newsTime').textContent = 'Última: ' + new Date().toLocaleTimeString('pt-BR');
+    }catch(err){
+      container.innerHTML = '<div class="muted">Erro ao buscar notícias: ' + err.message + '</div>';
+    }
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', ()=>{ fetchHeadlines(); fetchPrices(); updateClock(); });
+  // auto refresh
+  setInterval(()=>{ fetchHeadlines(); fetchPrices(); }, config.autoInterval);
+
+  // initial load
+  fetchPrices();
+  fetchHeadlines();
+</script>
+</body>
+</html>
