@@ -1,0 +1,195 @@
+<!-- Dashboard MNQ - APEX Edition (Dark) - NinjaTrader Version
+     Instruções rápidas:
+     1) Salve este arquivo como: dashboard_mnq_apex_ninjatrader.html
+     2) Para carregar manchetes automaticamente cole uma NewsAPI key (https://newsapi.org) no campo CONFIG.
+        Alternativa sem chave: cole RSS de fontes (Reuters/BNN/CNBC) no campo RSS.
+     3) Faça upload do arquivo para um repositório GitHub e ative GitHub Pages (Settings > Pages > branch: main, folder: /) para obter um link público.
+
+     Observação importante: O NinjaTrader não fornece widget embutido para browser — este painel é de apoio (notícias + calendário + sinais) e deve ser usado junto com o NinjaTrader aberto. O painel mostra apenas notícias que impactam o Micro E-mini Nasdaq-100 (MNQ).
+-->
+
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard MNQ — APEX (NinjaTrader) — Dark</title>
+  <style>
+    :root{--bg:#05070a;--panel:#081016;--muted:#9aa7b2;--accent:#00e0a8;--danger:#ff6b6b;--card-radius:12px;font-family:Inter, Roboto, Arial, Helvetica, sans-serif}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#030406 0%,#05070a 100%);color:#d8e6ef}
+    .wrap{padding:16px;display:flex;gap:16px;box-sizing:border-box}
+    .col-left{width:360px;display:flex;flex-direction:column;gap:12px}
+    .col-right{flex:1;display:flex;flex-direction:column;gap:12px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:12px;border-radius:var(--card-radius);box-shadow:0 8px 30px rgba(2,6,12,0.7)}
+    .small{min-height:120px}
+    h1{margin:0;font-size:16px}
+    .muted{color:var(--muted);font-size:13px}
+    .time{font-weight:700;font-size:14px}
+    .btn{background:transparent;border:1px solid rgba(255,255,255,0.03);padding:8px 10px;border-radius:8px;color:var(--accent);cursor:pointer}
+
+    .news-list{display:flex;flex-direction:column;gap:8px;max-height:560px;overflow:auto;padding-right:6px}
+    .news-item{padding:10px;border-radius:8px;background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.02);cursor:pointer}
+    .news-title{font-weight:700}
+    .news-meta{font-size:12px;color:var(--muted);margin-top:6px}
+
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;text-align:left;border-bottom:1px dashed rgba(255,255,255,0.03);font-size:13px}
+    th{color:var(--muted);font-weight:700}
+
+    .footer{display:flex;justify-content:space-between;color:var(--muted);font-size:13px}
+    @media (max-width:980px){.wrap{flex-direction:column}.col-left{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="col-left">
+      <div class="card small">
+        <h1>Dashboard MNQ — APEX (NinjaTrader)</h1>
+        <div class="muted">Foco: Micro E‑mini Nasdaq‑100 (MNQ). Modo: Dark.</div>
+        <div style="height:8px"></div>
+        <div class="time" id="localTime">--:--</div>
+        <div class="muted">Horário: São Paulo (BRT)</div>
+      </div>
+
+      <div class="card small">
+        <div class="muted">Configuração (cole sua chave NewsAPI para notícias automáticas)</div>
+        <div style="height:8px"></div>
+        <input id="newsKey" placeholder="NewsAPI key (opcional)" style="width:100%;padding:8px;border-radius:8px;border:none;background:#071018;color:#dbe6ef;box-sizing:border-box" />
+        <div style="height:8px"></div>
+        <label class="muted">Ou cole um RSS (opcional)</label>
+        <input id="rssInput" placeholder="URL RSS (opcional)" style="width:100%;padding:8px;border-radius:8px;border:none;background:#071018;color:#dbe6ef;box-sizing:border-box" />
+        <div style="height:8px"></div>
+        <button class="btn" id="refreshBtn">Atualizar agora</button>
+        <div style="height:8px"></div>
+        <div class="muted">Obs: se não colar chave nem RSS, o painel mostrará links rápidos para Reuters/Investing/FT.</div>
+      </div>
+
+      <div class="card small">
+        <div class="muted">Observações NinjaTrader</div>
+        <div style="height:6px"></div>
+        <div class="muted">Use este painel como briefing. Abra NinjaTrader no monitor principal e esse painel no secundário (Web Tab no NinjaTrader 8 aceita páginas HTML).</div>
+      </div>
+
+      <div class="card small">
+        <div class="muted">APEX Tips</div>
+        <ul class="muted">
+          <li>Evite alavancagem em anúncios de alto impacto.</li>
+          <li>Período crítico: 08:50–11:30 BRT (pré-abertura e abertura dos EUA).</li>
+          <li>Verifique drawdown diário antes de operar posições grandes.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div class="card" style="min-height:220px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="muted">Manchetes (foco: MNQ / Nasdaq‑100)</div>
+          <div class="muted" id="newsTime">Última: --</div>
+        </div>
+        <div class="news-list" id="newsList">
+          <div class="muted">Carregando notícias... (cole sua NewsAPI key e clique em Atualizar)</div>
+        </div>
+      </div>
+
+      <div class="card" style="min-height:160px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="muted">Calendário econômico (EUA + globais relevantes)</div>
+          <div class="muted">Fonte: Investing / ForexFactory</div>
+        </div>
+        <div style="height:8px"></div>
+        <div id="calendarArea" class="muted">Cole TradingEconomics key para carregamento automático, ou abra o link abaixo.</div>
+        <div style="height:8px"></div>
+        <a class="muted" target="_blank" href="https://br.investing.com/economic-calendar/">Abrir Investing.com — Calendário</a>
+      </div>
+
+      <div class="card" style="min-height:220px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="muted">Leitura Rápida (MNQ)</div>
+          <div class="muted">Resumo</div>
+        </div>
+        <div id="quickRead" class="muted">Sem dados em tempo real. O painel foca em notícias que impactam o MNQ; para indicadores de ticks e execução use NinjaTrader.</div>
+      </div>
+
+      <div class="card footer" style="align-items:center">
+        <div class="muted">Template gerado por ChatGPT · Versão NinjaTrader · Dark</div>
+        <div class="muted">Dica: abrir às 09:00 BRT para briefing pré-market</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const config = { newsApiUrl: 'https://newsapi.org/v2/everything', rss2jsonUrl: 'https://api.rss2json.com/v1/api.json', timezone: 'America/Sao_Paulo' };
+
+    function updateClock(){
+      const now = new Date();
+      const s = now.toLocaleString('pt-BR', {timeZone: config.timezone});
+      const d = new Date(s);
+      const hhmm = d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      const dateStr = d.toLocaleDateString('pt-BR');
+      document.getElementById('localTime').textContent = hhmm + ' · ' + dateStr;
+    }
+    setInterval(updateClock,1000); updateClock();
+
+    // Fetch headlines filtered to only show items that are likely to impact MNQ/Nasdaq-100
+    async function fetchHeadlines(){
+      const key = document.getElementById('newsKey').value.trim();
+      const rss = document.getElementById('rssInput').value.trim();
+      const container = document.getElementById('newsList');
+      container.innerHTML = '<div class="muted">Buscando...</div>';
+      let articles = [];
+      try{
+        if(key){
+          const url = new URL(config.newsApiUrl);
+          // Query terms focused on Nasdaq-100 movers
+          url.searchParams.set('apiKey', key);
+          url.searchParams.set('q', 'Nasdaq OR Nasdaq-100 OR MNQ OR Nasdaq100 OR Nvidia OR Apple OR Microsoft OR Tesla OR semiconductors OR "Federal Reserve" OR Fed OR inflation OR interest rate OR China OR ASML');
+          url.searchParams.set('language','en');
+          url.searchParams.set('pageSize','30');
+          url.searchParams.set('sortBy','publishedAt');
+          const r = await fetch(url);
+          const j = await r.json();
+          if(j.articles) articles = j.articles;
+        } else if(rss){
+          // Use rss2json to parse RSS feed
+          const u = new URL(config.rss2jsonUrl);
+          u.searchParams.set('rss_url', rss);
+          const r = await fetch(u);
+          const j = await r.json();
+          if(j.items) articles = j.items.map(it=>({title:it.title,description:it.description,source:{name:it.author||''},publishedAt:it.pubDate||'',url:it.link}));
+        } else {
+          container.innerHTML = '<div class="muted">Cole sua NewsAPI key ou um RSS para carregar manchetes automaticamente. Links rápidos: <a target="_blank" href="https://www.reuters.com/finance/markets">Reuters Markets</a> · <a target="_blank" href="https://www.bloomberg.com/markets">Bloomberg Markets</a></div>';
+          return;
+        }
+
+        // Filter articles for relevance to MNQ (simple keyword filter)
+        const keywords = ['nasdaq','nasdaq-100','mnq','nvidia','apple','microsoft','tesla','semiconductor','tsmc','asml','fed','federal reserve','interest rate','inflation','china'];
+        const filtered = articles.filter(a=>{
+          const text = (a.title + ' ' + (a.description||'') + ' ' + (a.source && a.source.name? a.source.name : '')).toLowerCase();
+          return keywords.some(k=>text.includes(k));
+        }).slice(0,20);
+
+        if(filtered.length===0){ container.innerHTML = '<div class="muted">Nenhuma manchete relevante encontrada no feed atual.</div>'; return; }
+
+        container.innerHTML = '';
+        filtered.forEach(a=>{
+          const it = document.createElement('div'); it.className='news-item';
+          it.innerHTML = `<div class="news-title">${a.title||'—'}</div><div class="news-meta">${(a.source && a.source.name? a.source.name : '')} · ${new Date(a.publishedAt).toLocaleString()}</div><div class="muted">${a.description? (a.description.length>220? a.description.slice(0,220)+'...': a.description) : ''}</div>`;
+          it.addEventListener('click', ()=> window.open(a.url,'_blank'));
+          container.appendChild(it);
+        });
+        document.getElementById('newsTime').textContent = 'Última: ' + new Date().toLocaleTimeString('pt-BR');
+      }catch(err){
+        container.innerHTML = '<div class="muted">Erro ao buscar notícias: ' + err.message + '</div>';
+      }
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', ()=>{ fetchHeadlines(); updateClock(); });
+
+    // Auto refresh every 5 minutes
+    setInterval(()=>{ fetchHeadlines(); }, 5*60*1000);
+
+    // Initial load
+    fetchHeadlines();
+  </script>
+</body>
+</html>
