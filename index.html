@@ -1,0 +1,155 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel MNQ — APEX / NinjaTrader</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #0e0e11;
+      color: #eaeaea;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background-color: #11131a;
+      text-align: center;
+      padding: 15px;
+      font-size: 1.4em;
+      font-weight: bold;
+      color: #00bcd4;
+      border-bottom: 1px solid #222;
+    }
+    main {
+      padding: 15px;
+      max-width: 900px;
+      margin: auto;
+    }
+    section {
+      margin-bottom: 20px;
+      background: #16181f;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 0 10px #0003;
+    }
+    h2 {
+      color: #00bcd4;
+      border-bottom: 1px solid #333;
+      padding-bottom: 5px;
+    }
+    a {
+      color: #00bcd4;
+      text-decoration: none;
+    }
+    .quote {
+      display: flex;
+      justify-content: space-between;
+      margin: 5px 0;
+      font-size: 1.1em;
+    }
+    .timestamp {
+      font-size: 0.9em;
+      color: #999;
+    }
+    footer {
+      text-align: center;
+      font-size: 0.8em;
+      color: #777;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <header>Painel MNQ — APEX / NinjaTrader</header>
+  <main>
+    <section id="info">
+      <p><b>Foco:</b> Micro E‑mini Nasdaq‑100 (MNQ) — Preços & Manchetes</p>
+      <p class="timestamp" id="time"></p>
+    </section>
+
+    <section id="quotes">
+      <h2>📈 Cotações ao Vivo</h2>
+      <div id="prices">Carregando dados...</div>
+    </section>
+
+    <section id="news">
+      <h2>📰 Manchetes Globais (Impacto no Nasdaq‑100)</h2>
+      <ul id="headlines">Carregando manchetes...</ul>
+    </section>
+
+    <section id="calendar">
+      <h2>📅 Calendário Econômico</h2>
+      <p>Confira eventos macro que podem impactar o mercado:</p>
+      <p><a href="https://www.investing.com/economic-calendar/" target="_blank">Abrir Calendário — Investing.com</a></p>
+      <p><a href="https://www.forexfactory.com/calendar" target="_blank">Abrir Calendário — ForexFactory</a></p>
+    </section>
+  </main>
+
+  <footer>
+    Template gerado por ChatGPT · Versão NinjaTrader · Dark · Atualiza a cada 5 minutos
+  </footer>
+
+  <script>
+    function updateTime() {
+      const now = new Date();
+      document.getElementById('time').textContent = 
+        `Atualizado: ${now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
+    }
+
+    async function loadQuotes() {
+      try {
+        const response = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/quote?symbols=NQ=F,^VIX,DX-Y.NYB,^TNX'));
+        const data = await response.json();
+        const json = JSON.parse(data.contents);
+        const results = json.quoteResponse.result;
+        let html = '';
+        results.forEach(q => {
+          html += `<div class='quote'><span>${q.shortName}</span><span>${q.regularMarketPrice.toFixed(2)} (${q.regularMarketChange.toFixed(2)})</span></div>`;
+        });
+        document.getElementById('prices').innerHTML = html;
+      } catch (e) {
+        document.getElementById('prices').textContent = 'Erro ao carregar cotações.';
+      }
+    }
+
+    async function loadNews() {
+      try {
+        const rssList = [
+          'https://feeds.reuters.com/reuters/businessNews',
+          'https://www.cnbc.com/id/100003114/device/rss/rss.xml',
+          'https://finance.yahoo.com/news/rssindex'
+        ];
+        const items = [];
+        for (const rss of rssList) {
+          const resp = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(rss));
+          const data = await resp.json();
+          const xml = new DOMParser().parseFromString(data.contents, 'text/xml');
+          xml.querySelectorAll('item').forEach(i => {
+            items.push({
+              title: i.querySelector('title').textContent,
+              link: i.querySelector('link').textContent,
+              pubDate: i.querySelector('pubDate') ? i.querySelector('pubDate').textContent : ''
+            });
+          });
+        }
+        items.sort((a,b) => new Date(b.pubDate) - new Date(a.pubDate));
+        const latest = items.slice(0, 10);
+        let html = '';
+        latest.forEach(n => {
+          html += `<li><a href='${n.link}' target='_blank'>${n.title}</a> <br><span class='timestamp'>${new Date(n.pubDate).toLocaleString('pt-BR')}</span></li>`;
+        });
+        document.getElementById('headlines').innerHTML = html;
+      } catch (e) {
+        document.getElementById('headlines').textContent = 'Erro ao carregar manchetes.';
+      }
+    }
+
+    updateTime();
+    loadQuotes();
+    loadNews();
+    setInterval(() => { updateTime(); loadQuotes(); loadNews(); }, 300000);
+  </script>
+</body>
+</html>
